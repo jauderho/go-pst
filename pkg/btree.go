@@ -1,696 +1,487 @@
-// Package pst
-// This file is part of go-pst (https://github.com/mooijtech/go-pst)
-// Copyright (C) 2021 Marten Mooij (https://www.mooijtech.com/)
+// go-pst is a library for reading Personal Storage Table (.pst) files (written in Go/Golang).
+//
+// Copyright (C) 2022  Marten Mooij
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package pst
 
 import (
 	"encoding/binary"
-	"errors"
+	"io"
+
+	"github.com/pkg/errors"
 )
 
 // GetNodeBTreeOffset returns the file offset to the node b-tree.
 // References "The 64-bit header data", "The 32-bit header data".
-func (pstFile *File) GetNodeBTreeOffset(formatType string) (int, error) {
-	var nodeBTreeFileOffset int
-	var nodeBTreeBufferSize int
+func (file *File) GetNodeBTreeOffset() (int64, error) {
+	var outputBuffer []byte
+	var offset int64
 
-	switch formatType {
+	switch file.FormatType {
 	case FormatTypeUnicode:
-		nodeBTreeFileOffset = 224
-		nodeBTreeBufferSize = 8
-		break
+		outputBuffer = make([]byte, 8)
+		offset = 224
 	case FormatTypeUnicode4k:
-		nodeBTreeFileOffset = 224
-		nodeBTreeBufferSize = 8
-		break
+		outputBuffer = make([]byte, 8)
+		offset = 224
 	case FormatTypeANSI:
-		nodeBTreeFileOffset = 188
-		nodeBTreeBufferSize = 4
-		break
+		outputBuffer = make([]byte, 4)
+		offset = 188
 	default:
-		return -1, errors.New("unsupported format type")
+		return 0, errors.WithStack(ErrFormatTypeUnsupported)
 	}
 
-	nodeBTreeOffset, err := pstFile.Read(nodeBTreeBufferSize, nodeBTreeFileOffset)
-
-	if err != nil {
-		return -1, err
+	if _, err := file.ReadAt(outputBuffer, offset); err != nil {
+		return 0, errors.WithStack(err)
 	}
 
-	switch formatType {
-	case FormatTypeUnicode:
-		return int(binary.LittleEndian.Uint64(nodeBTreeOffset)), nil
-	case FormatTypeUnicode4k:
-		return int(binary.LittleEndian.Uint64(nodeBTreeOffset)), nil
+	switch file.FormatType {
 	case FormatTypeANSI:
-		return int(binary.LittleEndian.Uint32(nodeBTreeOffset)), nil
+		return int64(binary.LittleEndian.Uint32(outputBuffer)), nil
 	default:
-		return -1, errors.New("unsupported format type")
+		return int64(binary.LittleEndian.Uint64(outputBuffer)), nil
 	}
 }
 
 // GetBlockBTreeOffset returns the file offset to the block b-tree.
 // References "The 64-bit header data", "The 32-bit header data".
-func (pstFile *File) GetBlockBTreeOffset(formatType string) (int, error) {
-	var blockBTreeFileOffset int
-	var blockBTreeBufferSize int
+func (file *File) GetBlockBTreeOffset() (int64, error) {
+	var outputBuffer []byte
+	var offset int64
 
-	switch formatType {
+	switch file.FormatType {
 	case FormatTypeUnicode:
-		blockBTreeFileOffset = 240
-		blockBTreeBufferSize = 8
-		break
+		outputBuffer = make([]byte, 8)
+		offset = 240
 	case FormatTypeUnicode4k:
-		blockBTreeFileOffset = 240
-		blockBTreeBufferSize = 8
-		break
+		outputBuffer = make([]byte, 8)
+		offset = 240
 	case FormatTypeANSI:
-		blockBTreeFileOffset = 196
-		blockBTreeBufferSize = 4
-		break
+		outputBuffer = make([]byte, 4)
+		offset = 196
 	default:
-		return -1, errors.New("unsupported format type")
+		return 0, errors.WithStack(ErrFormatTypeUnsupported)
 	}
 
-	blockBTreeOffset, err := pstFile.Read(blockBTreeBufferSize, blockBTreeFileOffset)
-
-	if err != nil {
-		return -1, err
+	if _, err := file.ReadAt(outputBuffer, offset); err != nil {
+		return 0, errors.WithStack(err)
 	}
 
-	switch formatType {
-	case FormatTypeUnicode:
-		return int(binary.LittleEndian.Uint64(blockBTreeOffset)), nil
-	case FormatTypeUnicode4k:
-		return int(binary.LittleEndian.Uint64(blockBTreeOffset)), nil
+	switch file.FormatType {
 	case FormatTypeANSI:
-		return int(binary.LittleEndian.Uint32(blockBTreeOffset)), nil
+		return int64(binary.LittleEndian.Uint32(outputBuffer)), nil
 	default:
-		return -1, errors.New("unsupported format type")
+		return int64(binary.LittleEndian.Uint64(outputBuffer)), nil
 	}
 }
 
 // GetBTreeNodeEntryCount returns the amount of entries in the b-tree.
 // References "The node and block b-tree".
-func (pstFile *File) GetBTreeNodeEntryCount(btreeNodeOffset int, formatType string) (int, error) {
-	var nodeEntryCountOffset int
-	var nodeEntryCountBufferSize int
+func (file *File) GetBTreeNodeEntryCount(btreeNodeOffset int64) (uint16, error) {
+	var outputBuffer []byte
+	var offset int64
 
-	switch formatType {
+	switch file.FormatType {
 	case FormatTypeUnicode:
-		nodeEntryCountOffset = btreeNodeOffset + 488
-		nodeEntryCountBufferSize = 1
-		break
+		outputBuffer = make([]byte, 1)
+		offset = btreeNodeOffset + 488
 	case FormatTypeUnicode4k:
-		nodeEntryCountOffset = btreeNodeOffset + 4056
-		nodeEntryCountBufferSize = 2
-		break
+		outputBuffer = make([]byte, 2)
+		offset = btreeNodeOffset + 4056
 	case FormatTypeANSI:
-		nodeEntryCountOffset = btreeNodeOffset + 496
-		nodeEntryCountBufferSize = 1
-		break
+		outputBuffer = make([]byte, 1)
+		offset = btreeNodeOffset + 496
 	default:
-		return -1, errors.New("unsupported format type")
+		return 0, errors.WithStack(ErrFormatTypeUnsupported)
 	}
 
-	nodeEntryCount, err := pstFile.Read(nodeEntryCountBufferSize, nodeEntryCountOffset)
-
-	if err != nil {
-		return -1, err
+	if _, err := file.ReadAt(outputBuffer, offset); err != nil {
+		return 0, errors.WithStack(err)
 	}
 
-	switch formatType {
-	case FormatTypeUnicode:
-		return int(binary.LittleEndian.Uint16([]byte{nodeEntryCount[0], 0})), nil
+	switch file.FormatType {
 	case FormatTypeUnicode4k:
-		return int(binary.LittleEndian.Uint16(nodeEntryCount)), nil
-	case FormatTypeANSI:
-		return int(binary.LittleEndian.Uint16([]byte{nodeEntryCount[0], 0})), nil
+		return binary.LittleEndian.Uint16(outputBuffer), nil
 	default:
-		return -1, errors.New("unsupported format type")
+		return uint16(outputBuffer[0]), nil
 	}
 }
 
 // GetBTreeNodeEntrySize returns the size of an entry in the b-tree.
 // References "The node and block b-tree".
-func (pstFile *File) GetBTreeNodeEntrySize(btreeNodeOffset int, formatType string) (int, error) {
-	var nodeEntrySizeOffset int
+func (file *File) GetBTreeNodeEntrySize(btreeNodeOffset int64) (uint8, error) {
+	outputBuffer := make([]byte, 1)
+	var offset int64
 
-	switch formatType {
+	switch file.FormatType {
 	case FormatTypeUnicode:
-		nodeEntrySizeOffset = btreeNodeOffset + 490
-		break
+		offset = btreeNodeOffset + 490
 	case FormatTypeUnicode4k:
-		nodeEntrySizeOffset = btreeNodeOffset + 4060
-		break
+		offset = btreeNodeOffset + 4060
 	case FormatTypeANSI:
-		nodeEntrySizeOffset = btreeNodeOffset + 498
-		break
+		offset = btreeNodeOffset + 498
 	default:
-		return -1, errors.New("unsupported format type")
+		return 0, errors.WithStack(ErrFormatTypeUnsupported)
 	}
 
-	nodeEntrySize, err := pstFile.Read(1, nodeEntrySizeOffset)
-
-	if err != nil {
-		return -1, err
+	if _, err := file.ReadAt(outputBuffer, offset); err != nil {
+		return 0, errors.WithStack(err)
 	}
 
-	return int(binary.LittleEndian.Uint16([]byte{nodeEntrySize[0], 0})), nil
+	return outputBuffer[0], nil
 }
 
 // GetBTreeNodeLevel returns the level of the b-tree node.
 // References "The node and block b-tree".
-func (pstFile *File) GetBTreeNodeLevel(btreeNodeOffset int, formatType string) (int, error) {
-	var nodeLevelOffset int
+func (file *File) GetBTreeNodeLevel(btreeNodeOffset int64) (uint8, error) {
+	outputBuffer := make([]byte, 1)
+	var offset int64
 
-	switch formatType {
+	switch file.FormatType {
 	case FormatTypeUnicode:
-		nodeLevelOffset = btreeNodeOffset + 491
-		break
+		offset = btreeNodeOffset + 491
 	case FormatTypeUnicode4k:
-		nodeLevelOffset = btreeNodeOffset + 4061
-		break
+		offset = btreeNodeOffset + 4061
 	case FormatTypeANSI:
-		nodeLevelOffset = btreeNodeOffset + 499
-		break
+		offset = btreeNodeOffset + 499
 	default:
-		return -1, errors.New("unsupported format type")
+		return 0, errors.WithStack(ErrFormatTypeUnsupported)
 	}
 
-	nodeLevel, err := pstFile.Read(1, nodeLevelOffset)
-
-	if err != nil {
-		return -1, err
+	if _, err := file.ReadAt(outputBuffer, offset); err != nil {
+		return 0, errors.WithStack(err)
 	}
 
-	return int(binary.LittleEndian.Uint16([]byte{nodeLevel[0], 0})), nil
+	return outputBuffer[0], nil
 }
 
-// BTreeNodeEntry represents an entry in a b-tree node.
-type BTreeNodeEntry struct {
-	Data []byte
-	Children []BTreeNodeEntry
+// BTreeNode represents an entry in a b-tree node.
+type BTreeNode struct {
+	// Identifier is only unique to the node level.
+	Identifier                 Identifier `json:"identifier"`
+	FileOffset                 int64      `json:"fileOffset"`
+	DataIdentifier             Identifier `json:"dataIdentifier"`
+	LocalDescriptorsIdentifier Identifier `json:"localDescriptorsIdentifier"`
+	Size                       uint16     `json:"size"`
+	NodeLevel                  uint8      `json:"nodeLevel"`
+}
+
+// NewBTreeNodeReader is used by the Heap-on-Node.
+func NewBTreeNodeReader(btreeNode BTreeNode, file *File) *io.SectionReader {
+	return io.NewSectionReader(file, btreeNode.FileOffset, int64(btreeNode.Size))
+}
+
+// BTreeNodeLessFunc tests whether the current node is less than the given argument.
+//
+// This must provide a strict weak ordering.
+// If !a.Less(b) && !b.Less(a), we treat this to mean a == b (we can only hold one of either a or b in the tree).
+func BTreeNodeLessFunc(a BTreeNode, b BTreeNode) bool {
+	if a.Identifier == b.Identifier {
+		// We don't return the first identifier because there may be two or more nodes with
+		// the same identifier, so prefer leaf nodes (which there is always only one of).
+		return a.NodeLevel < b.NodeLevel
+	} else {
+		return a.Identifier < b.Identifier
+	}
+}
+
+// GetBTreeNodeRawEntries returns the raw b-tree node entries in bytes.
+// Used by GetBTreeNodeEntries.
+func (file *File) GetBTreeNodeRawEntries(btreeNodeOffset int64) ([]byte, error) {
+	var outputBuffer []byte
+
+	switch file.FormatType {
+	case FormatTypeUnicode:
+		outputBuffer = make([]byte, 488)
+	case FormatTypeUnicode4k:
+		outputBuffer = make([]byte, 4056)
+	case FormatTypeANSI:
+		outputBuffer = make([]byte, 496)
+	default:
+		return nil, errors.WithStack(ErrFormatTypeUnsupported)
+	}
+
+	if _, err := file.ReadAt(outputBuffer, btreeNodeOffset); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return outputBuffer, nil
 }
 
 // GetBTreeNodeEntries returns the entries in the b-tree node.
 // References "The node and block b-tree".
-func (pstFile *File) GetBTreeNodeEntries(btreeNodeOffset int, formatType string) ([]BTreeNodeEntry, error) {
-	var nodeEntriesBufferSize int
-
-	switch formatType {
-	case FormatTypeUnicode:
-		nodeEntriesBufferSize = 488
-		break
-	case FormatTypeUnicode4k:
-		nodeEntriesBufferSize = 4056
-		break
-	case FormatTypeANSI:
-		nodeEntriesBufferSize = 496
-		break
-	default:
-		return nil, errors.New("unsupported format type")
-	}
-
-	nodeEntries, err := pstFile.Read(nodeEntriesBufferSize, btreeNodeOffset)
+func (file *File) GetBTreeNodeEntries(btreeNodeOffset int64, btreeType BTreeType, btreeNodeLevel uint8) ([]BTreeNode, error) {
+	btreeNodeRawEntries, err := file.GetBTreeNodeRawEntries(btreeNodeOffset)
 
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	nodeEntryCount, err := pstFile.GetBTreeNodeEntryCount(btreeNodeOffset, formatType)
+	btreeNodeEntryCount, err := file.GetBTreeNodeEntryCount(btreeNodeOffset)
 
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	nodeEntrySize, err := pstFile.GetBTreeNodeEntrySize(btreeNodeOffset, formatType)
+	btreeNodeEntrySize, err := file.GetBTreeNodeEntrySize(btreeNodeOffset)
 
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	entries := make([]BTreeNodeEntry, nodeEntryCount)
+	btreeNodeEntries := make([]BTreeNode, btreeNodeEntryCount)
 
-	for i := 0; i < nodeEntryCount; i++ {
-		nodeEntry := nodeEntries[(i * nodeEntrySize) : (i*nodeEntrySize)+nodeEntrySize]
+	for i := 0; i < int(btreeNodeEntryCount); i++ {
+		btreeNodeEntryData := btreeNodeRawEntries[i*int(btreeNodeEntrySize) : (i*int(btreeNodeEntrySize))+int(btreeNodeEntrySize)]
 
-		entries[i] = BTreeNodeEntry {
-			Data: nodeEntry,
-		}
-	}
-
-	return entries, nil
-}
-
-// GetIdentifier returns the identifier of this b-tree node entry.
-// References "The b-tree entries".
-func (btreeNodeEntry *BTreeNodeEntry) GetIdentifier(formatType string) (int, error) {
-	var identifierBufferSize int
-
-	switch formatType {
-	case FormatTypeUnicode:
-		identifierBufferSize = 8
-		break
-	case FormatTypeUnicode4k:
-		identifierBufferSize = 8
-		break
-	case FormatTypeANSI:
-		identifierBufferSize = 4
-		break
-	default:
-		return -1, errors.New("unsupported format type")
-	}
-
-	return int(binary.LittleEndian.Uint32(btreeNodeEntry.Data[:identifierBufferSize])), nil
-}
-
-// Constants defining the identifier types.
-// References "Identifier types".
-const (
-	IdentifierTypeHID                     = 0
-	IdentifierTypeInternal                = 1
-	IdentifierTypeNormalFolder            = 2
-	IdentifierTypeSearchFolder            = 3
-	IdentifierTypeNormalMessage           = 4
-	IdentifierTypeAttachment              = 5
-	IdentifierTypeSearchUpdateQueue       = 6
-	IdentifierTypeSearchCriteriaObject    = 7
-	IdentifierTypeAssociatedMessage       = 8
-	IdentifierTypeContentsTableIndex      = 10
-	IdentifierTypeReceiveFolderTable      = 11
-	IdentifierTypeOutgoingQueueTable      = 12
-	IdentifierTypeHierarchyTable          = 13
-	IdentifierTypeContentsTable           = 14
-	IdentifierTypeAssociatedContentsTable = 15
-	IdentifierTypeSearchContentsTable     = 16
-	IdentifierTypeAttachmentTable         = 17
-	IdentifierTypeRecipientTable          = 18
-	IdentifierTypeSearchTableIndex        = 19
-	IdentifierTypeLTP                     = 31
-
-	IdentifierTypeRootFolder   = 290
-	IdentifierTypeMessageStore = 33
-	IdentifierTypeNameToIDMap  = 97
-)
-
-// GetIdentifierType returns the b-tree node entry identifier type.
-// References "The b-tree entries", "Identifier".
-func (btreeNodeEntry *BTreeNodeEntry) GetIdentifierType(formatType string) (int, error) {
-	nodeEntryIdentifier, err := btreeNodeEntry.GetIdentifier(formatType)
-
-	if err != nil {
-		return -1, err
-	}
-
-	// Bit masking:
-	// Use bitwise ANDing in order to extract a subset of the bits in the value.
-	// 11111 (binary) = 0x1F (hex), which with bitwise ANDing extracts the first 5 bits.
-	// See: https://www.rapidtables.com/convert/number/binary-to-hex.html
-	return nodeEntryIdentifier & 0x1F, nil
-}
-
-// GetFileOffset returns the file offset for this b-tree branch or leaf node.
-// References "The b-tree entries".
-func (btreeNodeEntry *BTreeNodeEntry) GetFileOffset(isBranchNode bool, formatType string) (int, error) {
-	var nodeOffsetOffset int
-	var nodeOffsetBufferSize int
-
-	if isBranchNode {
-		switch formatType {
-		case FormatTypeUnicode:
-			nodeOffsetOffset = 16
-			nodeOffsetBufferSize = 8
-			break
-		case FormatTypeUnicode4k:
-			nodeOffsetOffset = 16
-			nodeOffsetBufferSize = 8
-			break
-		case FormatTypeANSI:
-			nodeOffsetOffset = 8
-			nodeOffsetBufferSize = 4
-			break
-		default:
-			return -1, errors.New("unsupported format type")
-		}
-	} else {
-		switch formatType {
-		case FormatTypeUnicode:
-			nodeOffsetOffset = 8
-			nodeOffsetBufferSize = 8
-			break
-		case FormatTypeUnicode4k:
-			nodeOffsetOffset = 8
-			nodeOffsetBufferSize = 8
-			break
-		case FormatTypeANSI:
-			nodeOffsetOffset = 4
-			nodeOffsetBufferSize = 4
-			break
-		default:
-			return -1, errors.New("unsupported format type")
-		}
-	}
-
-	switch formatType {
-	case FormatTypeUnicode:
-		return int(binary.LittleEndian.Uint64(btreeNodeEntry.Data[nodeOffsetOffset:(nodeOffsetOffset + nodeOffsetBufferSize)])), nil
-	case FormatTypeUnicode4k:
-		return int(binary.LittleEndian.Uint64(btreeNodeEntry.Data[nodeOffsetOffset:(nodeOffsetOffset + nodeOffsetBufferSize)])), nil
-	case FormatTypeANSI:
-		return int(binary.LittleEndian.Uint32(btreeNodeEntry.Data[nodeOffsetOffset:(nodeOffsetOffset + nodeOffsetBufferSize)])), nil
-	default:
-		return -1, errors.New("unsupported format type")
-	}
-}
-
-// GetDataIdentifier returns the node identifier of the data (in the node b-tree).
-// References "The b-tree entries".
-func (btreeNodeEntry *BTreeNodeEntry) GetDataIdentifier(formatType string) (int, error) {
-	var dataOffset int
-	var dataBufferSize int
-
-	switch formatType {
-	case FormatTypeUnicode:
-		dataOffset = 8
-		dataBufferSize = 8
-		break
-	case FormatTypeUnicode4k:
-		dataOffset = 8
-		dataBufferSize = 8
-		break
-	case FormatTypeANSI:
-		dataOffset = 4
-		dataBufferSize = 4
-		break
-	default:
-		return -1, errors.New("unsupported format type")
-	}
-
-	switch formatType {
-	case FormatTypeUnicode:
-		return int(binary.LittleEndian.Uint64(btreeNodeEntry.Data[dataOffset:(dataOffset + dataBufferSize)])), nil
-	case FormatTypeUnicode4k:
-		return int(binary.LittleEndian.Uint64(btreeNodeEntry.Data[dataOffset:(dataOffset + dataBufferSize)])), nil
-	case FormatTypeANSI:
-		return int(binary.LittleEndian.Uint32(btreeNodeEntry.Data[dataOffset:(dataOffset + dataBufferSize)])), nil
-	default:
-		return -1, errors.New("unsupported format type")
-	}
-}
-
-// GetLocalDescriptorsIdentifier returns the identifier to the local descriptors in the block b-tree.
-func (btreeNodeEntry *BTreeNodeEntry) GetLocalDescriptorsIdentifier(formatType string) (int, error) {
-	var localDescriptorsOffset int
-	var localDescriptorsBufferSize int
-
-	switch formatType {
-	case FormatTypeUnicode:
-		localDescriptorsOffset = 16
-		localDescriptorsBufferSize = 8
-		break
-	case FormatTypeUnicode4k:
-		localDescriptorsOffset = 16
-		localDescriptorsBufferSize = 8
-	case FormatTypeANSI:
-		localDescriptorsOffset = 8
-		localDescriptorsBufferSize = 4
-	default:
-		return -1, errors.New("unsupported format type")
-	}
-
-	switch formatType {
-	case FormatTypeUnicode:
-		return int(binary.LittleEndian.Uint64(btreeNodeEntry.Data[localDescriptorsOffset : localDescriptorsOffset+localDescriptorsBufferSize])), nil
-	case FormatTypeUnicode4k:
-		return int(binary.LittleEndian.Uint64(btreeNodeEntry.Data[localDescriptorsOffset : localDescriptorsOffset+localDescriptorsBufferSize])), nil
-	case FormatTypeANSI:
-		return int(binary.LittleEndian.Uint32(btreeNodeEntry.Data[localDescriptorsOffset : localDescriptorsOffset+localDescriptorsBufferSize])), nil
-	default:
-		return -1, errors.New("unsupported format type")
-	}
-}
-
-// GetSize returns the size of the data in the block b-tree leaf node entry.
-// References "The b-tree entries".
-func (btreeNodeEntry *BTreeNodeEntry) GetSize(formatType string) (int, error) {
-	var nodeSizeOffset int
-	var nodeSizeBufferSize int
-
-	switch formatType {
-	case FormatTypeUnicode:
-		nodeSizeOffset = 16
-		nodeSizeBufferSize = 2
-		break
-	case FormatTypeUnicode4k:
-		nodeSizeOffset = 16
-		nodeSizeBufferSize = 2
-		break
-	case FormatTypeANSI:
-		nodeSizeOffset = 8
-		nodeSizeBufferSize = 2
-		break
-	default:
-		return -1, errors.New("unsupported format type")
-	}
-
-	return int(binary.LittleEndian.Uint16(btreeNodeEntry.Data[nodeSizeOffset:(nodeSizeOffset + nodeSizeBufferSize)])), nil
-}
-
-// Constants defining the b-tree types.
-const (
-	BTreeTypeNode  = 0
-	BTreeTypeBlock = 1
-)
-
-// InitializeBTree walks the b-tree and finds the node with the given identifier.
-func (pstFile *File) InitializeBTree(btreeType int, formatType string) error {
-	if len(pstFile.NodeBTree) > 0 && btreeType == BTreeTypeNode || len(pstFile.BlockBTree) > 0 && btreeType == BTreeTypeBlock {
-		return errors.New("b-tree is already initialized")
-	}
-
-	switch btreeType {
-	case BTreeTypeNode:
-		nodeBTreeOffset, err := pstFile.GetNodeBTreeOffset(formatType)
-
-		if err != nil {
-			return err
-		}
-
-		nodeBTreeNodes, err := pstFile.WalkBTree(nodeBTreeOffset, formatType)
-
-		if err != nil {
-			return err
-		}
-
-		pstFile.NodeBTree = nodeBTreeNodes
-		return nil
-	case BTreeTypeBlock:
-		blockBTreeOffset, err := pstFile.GetBlockBTreeOffset(formatType)
-
-		if err != nil {
-			return err
-		}
-
-		blockBTreeNodes, err := pstFile.WalkBTree(blockBTreeOffset, formatType)
-
-		if err != nil {
-			return err
-		}
-
-		pstFile.BlockBTree = blockBTreeNodes
-		return nil
-	default:
-		return errors.New("invalid b-tree type")
-	}
-}
-
-// InitializeBTrees initializes the node and block b-tree.
-func (pstFile *File) InitializeBTrees(formatType string) error {
-	err := pstFile.InitializeBTree(BTreeTypeNode, formatType)
-
-	if err != nil {
-		return err
-	}
-
-	err = pstFile.InitializeBTree(BTreeTypeBlock, formatType)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// WalkBTree walks the b-tree and returns all nodes.
-func (pstFile *File) WalkBTree(btreeOffset int, formatType string) ([]BTreeNodeEntry, error) {
-	nodeEntries, err := pstFile.GetBTreeNodeEntries(btreeOffset, formatType)
-
-	if err != nil {
-		return []BTreeNodeEntry{}, err
-	}
-
-	nodeLevel, err := pstFile.GetBTreeNodeLevel(btreeOffset, formatType)
-
-	if err != nil {
-		return []BTreeNodeEntry{}, err
-	}
-
-	var btreeNodeEntries []BTreeNodeEntry
-
-	if nodeLevel > 0 {
-		// Branch node entries.
-		for i := 0; i < len(nodeEntries); i++ {
-			nodeEntry := nodeEntries[i]
-
-			// Recursively walk through the branch node entries.
-			recursiveNodeOffset, err := nodeEntry.GetFileOffset(true, formatType)
-
-			if err != nil {
-				return []BTreeNodeEntry{}, err
+		if btreeNodeLevel > 0 && (btreeType == BTreeTypeNode || btreeType == BTreeTypeBlock) {
+			// Branch node or block b-tree node.
+			btreeNodeEntries[i] = BTreeNode{
+				Identifier: GetBTreeNodeEntryIdentifier(btreeNodeEntryData, file.FormatType),
+				FileOffset: GetBTreeNodeEntryFileOffset(btreeNodeEntryData, true, file.FormatType),
+				NodeLevel:  btreeNodeLevel,
 			}
-
-			recursiveNodeEntries, err := pstFile.WalkBTree(recursiveNodeOffset, formatType)
-
-			if err != nil {
-				return []BTreeNodeEntry{}, err
+		} else if btreeNodeLevel == 0 && btreeType == BTreeTypeNode {
+			// Leaf node b-tree node.
+			btreeNodeEntries[i] = BTreeNode{
+				Identifier:                 GetBTreeNodeEntryIdentifier(btreeNodeEntryData, file.FormatType),
+				DataIdentifier:             GetBTreeNodeEntryDataIdentifier(btreeNodeEntryData, file.FormatType),
+				LocalDescriptorsIdentifier: GetBTreeNodeEntryLocalDescriptorsIdentifier(btreeNodeEntryData, file.FormatType),
+				NodeLevel:                  btreeNodeLevel,
 			}
-
-			nodeEntry.Children = append(nodeEntry.Children, recursiveNodeEntries...)
-			btreeNodeEntries = append(btreeNodeEntries, nodeEntry)
-		}
-	} else {
-		// Leaf node entries
-		for i := 0; i < len(nodeEntries); i++ {
-			nodeEntry := nodeEntries[i]
-
-			btreeNodeEntries = append(btreeNodeEntries, nodeEntry)
+		} else if btreeNodeLevel == 0 && btreeType == BTreeTypeBlock {
+			// Leaf block b-tree node.
+			btreeNodeEntries[i] = BTreeNode{
+				Identifier: GetBTreeNodeEntryIdentifier(btreeNodeEntryData, file.FormatType),
+				FileOffset: GetBTreeNodeEntryFileOffset(btreeNodeEntryData, false, file.FormatType),
+				Size:       GetBTreeNodeEntrySize(btreeNodeEntryData, file.FormatType),
+				NodeLevel:  btreeNodeLevel,
+			}
 		}
 	}
 
 	return btreeNodeEntries, nil
 }
 
-// FindBTreeNodeFromNode recursively walks the children of this node to find the given identifier.
-func FindBTreeNodeFromNode(btreeNode BTreeNodeEntry, identifier int, formatType string) (BTreeNodeEntry, error) {
-	btreeNodeIdentifier, err := btreeNode.GetIdentifier(formatType)
+// GetBTreeNodeEntryIdentifier returns the Identifier of this b-tree node entry.
+// References "The b-tree entries".
+func GetBTreeNodeEntryIdentifier(btreeNodeEntryData []byte, formatType FormatType) Identifier {
+	return GetIdentifierFromBytes(btreeNodeEntryData[:GetIdentifierSize(formatType)], formatType)
+}
 
-	if err != nil {
-		return BTreeNodeEntry{}, err
-	}
-
-	for _, btreeNodeChild := range btreeNode.Children {
-		node, err := FindBTreeNodeFromNode(btreeNodeChild, identifier, formatType)
-
-		if err != nil {
-			continue
-		}
-
-		return node, nil
-	}
-
-	// Done looping through all children.
-	if btreeNodeIdentifier == identifier {
-		return btreeNode, nil
-	} else {
-		return BTreeNodeEntry{}, errors.New("failed to find b-tree node")
+// GetIdentifierFromBytes returns the Identifier type from bytes.
+func GetIdentifierFromBytes(identifierBytes []byte, formatType FormatType) Identifier {
+	switch formatType {
+	case FormatTypeANSI:
+		return Identifier(binary.LittleEndian.Uint32(identifierBytes))
+	default:
+		// TODO - Reference [MS-PDF] that this is actually 32-bit
+		return Identifier(binary.LittleEndian.Uint32(identifierBytes))
 	}
 }
 
-// FindBTreeNode returns the node in the node or block b-tree with the given identifier.
-// Note that we don't return the first identifier because there may be two or more nodes with
-// the same identifier so prefer leaf nodes (which there is always only one of).
-func (pstFile *File) FindBTreeNode(btreeType int, identifier int, formatType string) (BTreeNodeEntry, error) {
-	var btree []BTreeNodeEntry
-
-	switch btreeType {
-	case BTreeTypeNode:
-		btree = pstFile.NodeBTree
-	case BTreeTypeBlock:
-		btree = pstFile.BlockBTree
+// GetIdentifierSize returns the size of an Identifier.
+func GetIdentifierSize(formatType FormatType) uint8 {
+	switch formatType {
+	case FormatTypeANSI:
+		return 4
 	default:
-		return BTreeNodeEntry{}, errors.New("invalid b-tree type")
+		return 8
+	}
+}
+
+// Identifier represents a b-tree node identifier.
+// TODO - Document the int types per use case and use separate types.
+type Identifier int64
+
+// Constants defining the special b-tree node identifiers.
+const (
+	IdentifierRootFolder   Identifier = 290
+	IdentifierMessageStore Identifier = 33
+	IdentifierNameToIDMap  Identifier = 97
+)
+
+// GetType returns the IdentifierType of this Identifier.
+func (identifier Identifier) GetType() IdentifierType {
+	// Bit-masking:
+	// Use bitwise ANDing in order to extract a subset of the bits in the value.
+	// 11111 (binary) = 0x1F (hex), which with bitwise ANDing extracts the first 5 bits.
+	// See: https://www.rapidtables.com/convert/number/binary-to-hex.html
+	return IdentifierType(identifier & 0x1F)
+}
+
+// IdentifierType represents the type of Identifier.
+type IdentifierType uint8
+
+// Constants defining the identifier types.
+// References "Identifier types".
+const (
+	IdentifierTypeHID                     IdentifierType = 0
+	IdentifierTypeInternal                IdentifierType = 1
+	IdentifierTypeNormalFolder            IdentifierType = 2
+	IdentifierTypeSearchFolder            IdentifierType = 3
+	IdentifierTypeNormalMessage           IdentifierType = 4
+	IdentifierTypeAttachment              IdentifierType = 5
+	IdentifierTypeSearchUpdateQueue       IdentifierType = 6
+	IdentifierTypeSearchCriteriaObject    IdentifierType = 7
+	IdentifierTypeAssociatedMessage       IdentifierType = 8
+	IdentifierTypeContentsTableIndex      IdentifierType = 10
+	IdentifierTypeReceiveFolderTable      IdentifierType = 11
+	IdentifierTypeOutgoingQueueTable      IdentifierType = 12
+	IdentifierTypeHierarchyTable          IdentifierType = 13
+	IdentifierTypeContentsTable           IdentifierType = 14
+	IdentifierTypeAssociatedContentsTable IdentifierType = 15
+	IdentifierTypeSearchContentsTable     IdentifierType = 16
+	IdentifierTypeAttachmentTable         IdentifierType = 17
+	IdentifierTypeRecipientTable          IdentifierType = 18
+	IdentifierTypeSearchTableIndex        IdentifierType = 19
+	IdentifierTypeLTP                     IdentifierType = 31
+)
+
+// GetBTreeNodeEntryFileOffset returns the file offset for this b-tree branch or leaf node.
+// References "The b-tree entries".
+func GetBTreeNodeEntryFileOffset(btreeNodeEntryData []byte, isBranchNode bool, formatType FormatType) int64 {
+	if isBranchNode {
+		switch formatType {
+		case FormatTypeANSI:
+			return int64(binary.LittleEndian.Uint32(btreeNodeEntryData[8 : 8+4]))
+		default:
+			return int64(binary.LittleEndian.Uint64(btreeNodeEntryData[16 : 16+8]))
+		}
+	} else {
+		switch formatType {
+		case FormatTypeANSI:
+			return int64(binary.LittleEndian.Uint32(btreeNodeEntryData[4 : 4+4]))
+		default:
+			return int64(binary.LittleEndian.Uint64(btreeNodeEntryData[8 : 8+8]))
+		}
+	}
+}
+
+// GetBTreeNodeEntryDataIdentifier returns the node identifier of the data (in the block b-tree).
+// References "The b-tree entries".
+func GetBTreeNodeEntryDataIdentifier(btreeNodeEntryData []byte, formatType FormatType) Identifier {
+	switch formatType {
+	case FormatTypeANSI:
+		return GetIdentifierFromBytes(btreeNodeEntryData[4:4+GetIdentifierSize(formatType)], formatType)
+	default:
+		return GetIdentifierFromBytes(btreeNodeEntryData[8:8+GetIdentifierSize(formatType)], formatType)
+	}
+}
+
+// GetBTreeNodeEntryLocalDescriptorsIdentifier returns the identifier to the local descriptors in the block b-tree.
+func GetBTreeNodeEntryLocalDescriptorsIdentifier(btreeNodeEntryData []byte, formatType FormatType) Identifier {
+	switch formatType {
+	case FormatTypeANSI:
+		return GetIdentifierFromBytes(btreeNodeEntryData[8:8+GetIdentifierSize(formatType)], formatType)
+	default:
+		return GetIdentifierFromBytes(btreeNodeEntryData[16:16+GetIdentifierSize(formatType)], formatType)
+	}
+}
+
+// GetBTreeNodeEntrySize returns the size of the data in the block b-tree leaf node entry.
+// References "The b-tree entries".
+func GetBTreeNodeEntrySize(btreeNodeEntryData []byte, formatType FormatType) uint16 {
+	switch formatType {
+	case FormatTypeANSI:
+		return binary.LittleEndian.Uint16(btreeNodeEntryData[8 : 8+2])
+	default:
+		return binary.LittleEndian.Uint16(btreeNodeEntryData[16 : 16+2])
+	}
+}
+
+// BTreeType represents either the node b-tree or block b-tree.
+type BTreeType uint8
+
+// Constants defining the b-tree types.
+const (
+	BTreeTypeNode BTreeType = iota
+	BTreeTypeBlock
+)
+
+// WalkAndCreateBTree walks the b-tree and updates the given b-tree store.
+func (file *File) WalkAndCreateBTree(btreeOffset int64, btreeType BTreeType, btreeStore BTreeStore) error {
+	nodeLevel, err := file.GetBTreeNodeLevel(btreeOffset)
+
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
-	for i, btreeNode := range btree {
-		if i == len(btree) -1 {
-			node, err := FindBTreeNodeFromNode(btreeNode, identifier, formatType)
+	nodeEntries, err := file.GetBTreeNodeEntries(btreeOffset, btreeType, nodeLevel)
 
-			if err != nil {
-				// Failed to find identifier.
-				continue
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	if nodeLevel > 0 {
+		// Branch node entries.
+		for i := 0; i < len(nodeEntries); i++ {
+			nodeEntry := nodeEntries[i]
+
+			if _, exists := btreeStore.Load(nodeEntry); exists {
+				return errors.WithStack(ErrBTreeNodeConflict)
 			}
 
-			return node, nil
-		} else {
-			nextBTreeNode := btree[i + 1]
-
-			nextBTreeNodeIdentifier, err := nextBTreeNode.GetIdentifier(formatType)
+			err = file.WalkAndCreateBTree(nodeEntry.FileOffset, btreeType, btreeStore)
 
 			if err != nil {
-				return BTreeNodeEntry{}, err
+				return errors.WithStack(err)
 			}
-
-			if nextBTreeNodeIdentifier > identifier {
-				node, err := FindBTreeNodeFromNode(btreeNode, identifier, formatType)
-
-				if err != nil {
-					// Failed to find identifier.
-					continue
-				}
-
-				return node, nil
+		}
+	} else {
+		// Leaf node entries
+		for i := 0; i < len(nodeEntries); i++ {
+			if _, exists := btreeStore.Load(nodeEntries[i]); exists {
+				return errors.WithStack(ErrBTreeNodeConflict)
 			}
 		}
 	}
 
-	return BTreeNodeEntry{}, errors.New("failed to find b-tree node")
+	return nil
+}
+
+// GetBTreeNode returns the node in the node or block b-tree with the given identifier.
+func (file *File) GetBTreeNode(identifier Identifier, btreeStore BTreeStore) (BTreeNode, error) {
+	btreeNode, found := btreeStore.Get(BTreeNode{Identifier: identifier})
+
+	if !found {
+		return BTreeNode{}, errors.WithStack(ErrBTreeNodeNotFound)
+	}
+
+	return btreeNode, nil
 }
 
 // GetNodeBTreeNode returns the node with the given identifier in the node b-tree.
-func (pstFile *File) GetNodeBTreeNode(identifier int, formatType string) (BTreeNodeEntry, error) {
-	nodeBTreeNode, err := pstFile.FindBTreeNode(BTreeTypeNode, identifier, formatType)
-
-	if err != nil {
-		return BTreeNodeEntry{}, err
-	}
-
-	return nodeBTreeNode, nil
+func (file *File) GetNodeBTreeNode(identifier Identifier) (BTreeNode, error) {
+	return file.GetBTreeNode(identifier, file.NodeBTree)
 }
 
 // GetBlockBTreeNode returns the node with the given identifier in the block b-tree.
-func (pstFile *File) GetBlockBTreeNode(identifier int, formatType string) (BTreeNodeEntry, error) {
-	// Clear the LSB, which is reserved, but sometimes set.
-	identifier &= 0xfffffffe
-
-	nodeBTreeNode, err := pstFile.FindBTreeNode(BTreeTypeBlock, identifier, formatType)
-
-	if err != nil {
-		return BTreeNodeEntry{}, err
-	}
-
-	return nodeBTreeNode, nil
+func (file *File) GetBlockBTreeNode(identifier Identifier) (BTreeNode, error) {
+	// Clear the least significant bit (LSB), which is reserved, but sometimes set.
+	return file.GetBTreeNode(identifier&0xfffffffe, file.BlockBTree)
 }
 
 // GetDataBTreeNode searches the identifier in the node b-tree, then searches the data identifier in the block b-tree.
-func (pstFile *File) GetDataBTreeNode(identifier int, formatType string) (BTreeNodeEntry, error) {
-	nodeBTreeNode, err := pstFile.GetNodeBTreeNode(identifier, formatType)
+func (file *File) GetDataBTreeNode(identifier Identifier) (BTreeNode, error) {
+	nodeBTreeNode, err := file.GetNodeBTreeNode(identifier)
 
 	if err != nil {
-		return BTreeNodeEntry{}, err
+		return BTreeNode{}, errors.WithStack(err)
 	}
 
-	dataIdentifier, err := nodeBTreeNode.GetDataIdentifier(formatType)
-
-	if err != nil {
-		return BTreeNodeEntry{}, err
-	}
-
-	blockBTreeNode, err := pstFile.GetBlockBTreeNode(dataIdentifier, formatType)
-
-	if err != nil {
-		return BTreeNodeEntry{}, err
-	}
-
-	return blockBTreeNode, nil
+	return file.GetBlockBTreeNode(nodeBTreeNode.DataIdentifier)
 }
