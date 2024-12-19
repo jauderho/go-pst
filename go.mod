@@ -1,6 +1,6 @@
 module github.com/mooijtech/go-pst/v6
 
-go 1.20
+go 1.23.2
 
 require (
 	github.com/emersion/go-message v0.18.1
@@ -8,14 +8,14 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rotisserie/eris v0.5.4
 	github.com/tidwall/btree v1.7.0
-	github.com/tinylib/msgp v1.2.1
-	golang.org/x/net v0.29.0
-	golang.org/x/text v0.18.0
-	google.golang.org/protobuf v1.34.2
+	github.com/tinylib/msgp v1.2.5
+	golang.org/x/net v0.33.0
+	golang.org/x/text v0.21.0
+	google.golang.org/protobuf v1.36.0
 )
 
 require (
 	github.com/libp2p/go-sockaddr v0.2.0 // indirect
-	github.com/philhofer/fwd v1.1.3-0.20240612014219-fbbf4953d986 // indirect
-	golang.org/x/sys v0.25.0 // indirect
+	github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c // indirect
+	golang.org/x/sys v0.28.0 // indirect
 )
