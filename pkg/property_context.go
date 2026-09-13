@@ -85,7 +85,7 @@ func (file *File) GetPropertyContext(heapOnNode *HeapOnNode) (*PropertyContext, 
 	var properties []Property
 	offset := int64(0)
 
-	for i := 0; i < keyCount; i++ {
+	for range keyCount {
 		// PropertyContextItem represents an item within the property context.
 		// References "Property Context B-Tree-on-Heap Record".
 		// References [MS-PDF]: 2.3.3.3 PC BTH Record

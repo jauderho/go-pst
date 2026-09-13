@@ -95,7 +95,7 @@ func (file *File) GetBlocks(btreeNodeHeapOnNodeOffset int64) ([]BTreeNode, error
 			return nil, eris.Wrap(err, "failed to read block identifiers")
 		}
 
-		for i := 0; i < entryCount; i++ {
+		for i := range entryCount {
 			blockIdentifier := GetIdentifierFromBytes(blockIdentifiers[i*identifierSize:(i*identifierSize)+identifierSize], file.FormatType)
 			blockBTreeNode, err := file.GetBlockBTreeNode(blockIdentifier) // TODO - Async then wait for the block b-tree node lookups.
 
@@ -113,7 +113,7 @@ func (file *File) GetBlocks(btreeNodeHeapOnNodeOffset int64) ([]BTreeNode, error
 			return nil, eris.Wrap(err, "failed to read block identifiers")
 		}
 
-		for i := 0; i < entryCount; i++ {
+		for i := range entryCount {
 			blockIdentifier := GetIdentifierFromBytes(blockIdentifiers[i*identifierSize:(i*identifierSize)+identifierSize], file.FormatType)
 			blockBTreeNode, err := file.GetBlockBTreeNode(blockIdentifier) // TODO - Async then wait for the block b-tree node lookups.
 

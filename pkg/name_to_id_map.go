@@ -138,7 +138,7 @@ func (file *File) GetNameToIDMap() (*NameToIDMap, error) {
 	guidIndexes := make([]int, guidCount)
 
 	// TODO - Do ReadAt up front.
-	for i := 0; i < guidCount; i++ {
+	for i := range guidCount {
 		guidBytes := make([]byte, 16)
 
 		if _, err := guidReader.ReadAt(guidBytes, offset); err != nil {

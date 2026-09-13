@@ -399,7 +399,7 @@ func (file *File) WalkAndCreateBTree(btreeOffset int64, btreeType BTreeType, btr
 	file.GetBTreeNodeEntries(btreeOffset, btreeType, func(nodeEntries []BTreeNode, nodeLevel uint8, err error) {
 		if nodeLevel > 0 {
 			// Branch node entries.
-			for i := 0; i < len(nodeEntries); i++ {
+			for i := range nodeEntries {
 				nodeEntry := nodeEntries[i]
 
 				if _, exists := btreeStore.Load(nodeEntry); exists {
@@ -410,7 +410,7 @@ func (file *File) WalkAndCreateBTree(btreeOffset int64, btreeType BTreeType, btr
 			}
 		} else {
 			// Leaf node entries
-			for i := 0; i < len(nodeEntries); i++ {
+			for i := range nodeEntries {
 				if _, exists := btreeStore.Load(nodeEntries[i]); exists {
 					panic(errors.WithStack(ErrBTreeNodeConflict))
 				}

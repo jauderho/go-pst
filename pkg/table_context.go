@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"io"
 	"math"
+	"slices"
 
 	"github.com/rotisserie/eris"
 )
@@ -122,11 +123,8 @@ func (file *File) GetTableContext(heapOnNode *HeapOnNode, localDescriptors []Loc
 
 		tableColumnDescriptors[i] = columnDescriptor
 
-		for _, propertyIDToGet := range propertyIDsToGet {
-			if columnDescriptor.PropertyID == propertyIDToGet {
-				columnIndexesToGet = append(columnIndexesToGet, i)
-				break
-			}
+		if slices.Contains(propertyIDsToGet, columnDescriptor.PropertyID) {
+			columnIndexesToGet = append(columnIndexesToGet, i)
 		}
 
 		columnDescriptorsOffset += 8 // Each column descriptor is 8 bytes in size.
@@ -162,7 +160,7 @@ func (file *File) GetTableContext(heapOnNode *HeapOnNode, localDescriptors []Loc
 	var currentRowStartOffset int64
 	tableContextItems := make([][]Property, numberOfRowsToReturn)
 
-	for rowIndex := 0; rowIndex < numberOfRowsToReturn; rowIndex++ {
+	for rowIndex := range numberOfRowsToReturn {
 		currentRowStartOffset = int64((((startAtRow + rowIndex) / rowsPerBlock) * (blockSize - blockTrailerSize)) + (((startAtRow + rowIndex) % rowsPerBlock) * int(binary.LittleEndian.Uint16(rowSize))))
 		cellExistenceBlock := make([]byte, cellExistenceBlockSize)
 

@@ -231,7 +231,7 @@ func (message *Message) GetAllAttachments() ([]*Attachment, error) {
 
 	attachments := make([]*Attachment, attachmentCount)
 
-	for i := 0; i < attachmentCount; i++ {
+	for i := range attachmentCount {
 		attachment, err := message.GetAttachment(i)
 
 		if err != nil {
